@@ -1,0 +1,72 @@
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from scipy.optimize import minimize
+
+##client data###
+demand = 1000 - 50 * price + 20 * cost + np.random.normal(0, 500, n_obs)
+data = pd.DataFrame({'price': price, 'cost': cost, 'demand': demand})
+
+# train machine learning model
+X_train, X_test, y_train, y_test = train_test_split(data[['price', 'cost']], data['demand'], test_size=0.2, random_state=42)
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+# define objective function
+def objective(x, data, model):
+    revenue = (model.predict(data[['price', 'cost']]) - x[1]) * x[0]
+    cost = data['demand'] * x[1]
+    profit = revenue - cost
+    return -profit.mean()
+
+# define bounds and initial guess
+bounds = [(0, 20), (0, 10)]
+x0 = [10, 5]
+
+# optimize price and cost
+result = minimize(objective, x0, args=(data, model), bounds=bounds)
+
+# check optimization results
+if not result.success:
+    raise ValueError('Optimization failed. Try adjusting bounds or initial guess.')
+    
+price_opt = result.x[0]
+cost_opt = result.x[1]
+
+# predict demand at optimal price and cost
+demand_pred = model.predict([[price_opt, cost_opt]])
+
+# calculate revenue and profit at optimal values
+revenue_opt = price_opt * demand_pred
+costs_opt = cost_opt * demand_pred
+profit_opt = revenue_opt - costs_opt
+
+# check revenue, costs, and profit accuracy
+revenue_acc = abs(revenue_opt - data['demand'].mean() * price_opt) < 0.01 * data['demand'].mean() * price_opt
+costs_acc = abs(costs_opt - data['demand'].mean() * cost_opt) < 0.01 * data['demand'].mean() * cost_opt
+profit_acc = abs(profit_opt + result.fun) < 0.01 * abs(result.fun)
+
+if not (revenue_acc and costs_acc and profit_acc):
+    raise ValueError('Revenue, costs, or profit calculations are inaccurate. Check the optimization and objective function.')
+
+# visualize optimal prices
+sns.scatterplot(x='price', y='demand', data=data)
+plt.axvline(price_opt, color='r')
+plt.title(f'Optimal Price: {price_opt:.2f}')
+plt.show()
+
+# visualize optimal costs
+sns.scatterplot(x='cost', y='demand', data=data)
+plt.axvline(cost_opt, color='r')
+plt.title(f'Optimal Cost: {cost_opt:.2f}')
+plt.show()
+
+# visualize optimal revenue and profit
+sns.scatterplot(x='demand', y='revenue', data=data)
+plt.axvline(demand_pred, color='r')
+plt.axhline(revenue_opt, color='r')
+plt.title('Optimal Revenue and Profit')
+plt.show()
