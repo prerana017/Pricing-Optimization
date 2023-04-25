@@ -1,0 +1,63 @@
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+###Client Data###
+demand = 1000 - 50 * price + 20 * cost + np.random.normal(0, 500, n_obs)
+data = pd.DataFrame({'price': price, 'cost': cost, 'demand': demand})
+
+# define objective function
+def objective(x, data):
+    revenue = (data['demand'] * x[0] - data['demand'] * x[1]) * x[2]
+    cost = data['demand'] * x[1]
+    profit = revenue - cost
+    return -profit.mean()
+
+# define bounds and initial guess
+bounds = [(0, 20), (0, 10), (0, 100)]
+x0 = [10, 5, 50]
+
+# optimize price, cost, and quantity
+from scipy.optimize import minimize
+result = minimize(objective, x0, args=(data,), bounds=bounds)
+
+# check optimization results
+if not result.success:
+    raise ValueError('Optimization failed. Try adjusting bounds or initial guess.')
+    
+price_opt = result.x[0]
+cost_opt = result.x[1]
+quantity_opt = result.x[2]
+
+# calculate revenue and profit at optimal values
+data['revenue'] = data['demand'] * price_opt
+data['costs'] = data['demand'] * cost_opt
+data['profit'] = data['revenue'] - data['costs']
+
+# check revenue and profit accuracy
+revenue_acc = abs(data['revenue'].mean() - data['demand'].mean() * price_opt) < 0.01 * data['demand'].mean() * price_opt
+costs_acc = abs(data['costs'].mean() - data['demand'].mean() * cost_opt) < 0.01 * data['demand'].mean() * cost_opt
+profit_acc = abs(data['profit'].mean() + result.fun) < 0.01 * abs(result.fun)
+
+if not (revenue_acc and costs_acc and profit_acc):
+    raise ValueError('Revenue, costs, or profit calculations are inaccurate. Check the optimization and objective function.')
+
+# visualize optimal prices
+sns.scatterplot(x='price', y='demand', data=data)
+plt.axvline(price_opt, color='r')
+plt.title(f'Optimal Price: {price_opt:.2f}')
+plt.show()
+
+# visualize optimal costs
+sns.scatterplot(x='cost', y='demand', data=data)
+plt.axvline(cost_opt, color='r')
+plt.title(f'Optimal Cost: {cost_opt:.2f}')
+plt.show()
+
+# visualize optimal revenue and profit
+sns.scatterplot(x='revenue', y='profit', data=data)
+plt.axvline(data['revenue'].mean(), color='r')
+plt.axhline(data['profit'].mean(), color='r')
+plt.title('Optimal Revenue and Profit')
+plt.show()
